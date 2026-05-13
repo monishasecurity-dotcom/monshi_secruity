@@ -509,8 +509,10 @@ textarea:focus-visible {
 }
 
 .department-card {
-  min-height: 210px;
+  min-height: 120px;
   padding: 26px;
+  display: flex;
+  align-items: center;
   border: 1px solid #eee4d9;
   border-radius: 8px;
   background: #f5f1e9;
