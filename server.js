@@ -6,7 +6,8 @@ require('dotenv').config()
 
 const root = __dirname
 const port = Number(process.env.PORT) || 5176
-const enquiryTo = 'monisha.security@gmail.com'
+const host = process.env.HOST || '0.0.0.0'
+const enquiryTo = process.env.ENQUIRY_TO || 'monisha.security@gmail.com'
 const maxBodySize = 100_000
 const enquiryWindowMs = 15 * 60 * 1000
 const maxEnquiriesPerWindow = 5
@@ -70,6 +71,17 @@ const createTransporter = () =>
       pass: process.env.SMTP_PASS,
     },
   })
+
+const logMailError = (error) => {
+  console.error('Failed to send enquiry email:', {
+    message: error?.message,
+    code: error?.code,
+    command: error?.command,
+    response: error?.response,
+    responseCode: error?.responseCode,
+    stack: error?.stack,
+  })
+}
 
 const getClientIp = (request) => request.socket.remoteAddress || 'unknown'
 
@@ -177,7 +189,7 @@ const server = http.createServer((request, response) => {
 
       sendJson(response, 200, { ok: true })
     })().catch((error) => {
-      console.error('Failed to send enquiry email:', error)
+      logMailError(error)
       sendJson(response, 500, { ok: false, message: 'Email could not be sent.' })
     })
 
@@ -187,6 +199,13 @@ const server = http.createServer((request, response) => {
   sendStaticFile(url, response)
 })
 
-server.listen(port, '127.0.0.1', () => {
-  console.log(`Monisha Security Agency site running at http://127.0.0.1:${port}`)
+server.listen(port, host, () => {
+  console.log(`Monisha Security Agency site running on http://${host}:${port}`)
+  console.log('SMTP configuration:', {
+    host: process.env.SMTP_HOST || '(missing)',
+    port: process.env.SMTP_PORT || '(missing)',
+    secure: process.env.SMTP_SECURE || '(missing)',
+    user: process.env.SMTP_USER || '(missing)',
+    enquiryTo,
+  })
 })
