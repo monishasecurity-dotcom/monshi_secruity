@@ -1,6 +1,6 @@
 const whatsappNumber = '919381029301'
 const web3FormsEndpoint = 'https://api.web3forms.com/submit'
-const web3FormsKey = '6e89256d-a60d-4874-a9bb-dc6034eea28e'
+const web3FormsKey = '33870631-afc9-4f41-8367-6b3ed273ebb0'
 
 const directMessage = [
   'Hello Monisha Security Agency,',
