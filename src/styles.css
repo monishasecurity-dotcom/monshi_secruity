@@ -623,8 +623,15 @@ textarea:focus-visible {
 .gallery-item--portrait-left img,
 .gallery-item--portrait-center img {
   height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
+  object-fit: cover;
+}
+
+.gallery-item--portrait-left img {
+  object-position: 54% center;
+}
+
+.gallery-item--portrait-center img {
+  object-position: 50% center;
 }
 
 .video-card img {
