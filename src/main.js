@@ -1,4 +1,6 @@
 const whatsappNumber = '919381029301'
+const web3FormsEndpoint = 'https://api.web3forms.com/submit'
+const web3FormsKey = '6e89256d-a60d-4874-a9bb-dc6034eea28e'
 
 const directMessage = [
   'Hello Monisha Security Agency,',
@@ -38,6 +40,17 @@ const buildEnquiryMessage = (data) =>
     '',
     'Thank you.',
   ].join('\n')
+
+const buildWeb3FormsPayload = (data) => ({
+  access_key: web3FormsKey,
+  subject: `Website Enquiry - ${data.purpose || 'Monisha Security Agency'}`,
+  from_name: 'Monisha Security Agency Website',
+  name: data.name,
+  email: data.email,
+  phone: data.phone || 'Not provided',
+  purpose: data.purpose || 'Not provided',
+  message: data.message || 'Not provided',
+})
 
 const menuToggle = document.querySelector('.menu-toggle')
 const navLinks = document.querySelector('.nav-links')
@@ -105,6 +118,10 @@ form?.addEventListener('submit', (event) => {
 
 emailButton?.addEventListener('click', async () => {
   if (!form?.reportValidity()) return
+  if (web3FormsKey === 'YOUR_WEB3FORMS_ACCESS_KEY') {
+    setFormStatus('Add your Web3Forms access key before sending email.', 'error')
+    return
+  }
 
   const originalText = emailButton.textContent
   emailButton.disabled = true
@@ -112,14 +129,15 @@ emailButton?.addEventListener('click', async () => {
   setFormStatus('Sending email...')
 
   try {
-    const response = await fetch('/api/enquiry', {
+    const response = await fetch(web3FormsEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getEnquiryData()),
+      body: JSON.stringify(buildWeb3FormsPayload(getEnquiryData())),
     })
+    const result = await response.json()
 
-    if (!response.ok) {
-      throw new Error('Email request failed')
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Email request failed')
     }
 
     setFormStatus('Mail sent successfully.', 'success')

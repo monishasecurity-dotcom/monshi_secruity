@@ -1,6 +1,6 @@
 # Monisha Security Agency Website
 
-Static website for Monisha Security Agency with a small Node.js server for local hosting and enquiry email delivery.
+Static website for Monisha Security Agency with a small Node.js server for local hosting and a Web3Forms-powered enquiry form.
 
 ## Run Locally
 
@@ -15,20 +15,16 @@ Open:
 http://127.0.0.1:5176
 ```
 
-## Email Setup
+## Web3Forms Setup
 
-Create a local `.env` file with SMTP settings:
+1. Create a free account at `https://web3forms.com/`
+2. Create a form access key
+3. Open `src/main.js` and replace:
 
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+```js
+const web3FormsKey = 'YOUR_WEB3FORMS_ACCESS_KEY'
 ```
 
-The `.env` file is ignored by Git and should not be committed.
+with your real access key.
 
-## Git LFS
-
-Large media files such as videos are tracked with Git LFS.
+The `.env` file is still ignored by Git and should not be committed.
