@@ -1,0 +1,136 @@
+const http = require('node:http')
+const fs = require('node:fs')
+const path = require('node:path')
+const nodemailer = require('nodemailer')
+require('dotenv').config()
+
+const root = __dirname
+const port = Number(process.env.PORT) || 5176
+const host = process.env.HOST || '0.0.0.0'
+const enquiryTo = 'monisha.security@gmail.com'
+
+const types = {
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.mp4': 'video/mp4',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+}
+
+const sendJson = (response, status, payload) => {
+  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
+  response.end(JSON.stringify(payload))
+}
+
+const readJsonBody = (request) =>
+  new Promise((resolve, reject) => {
+    let body = ''
+
+    request.on('data', (chunk) => {
+      body += chunk
+
+      if (body.length > 100_000) {
+        request.destroy()
+        reject(new Error('Request body too large'))
+      }
+    })
+
+    request.on('end', () => {
+      try {
+        resolve(JSON.parse(body || '{}'))
+      } catch (error) {
+        reject(error)
+      }
+    })
+
+    request.on('error', reject)
+  })
+
+const createTransporter = () =>
+  nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: String(process.env.SMTP_SECURE).toLowerCase() === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
+
+const server = http.createServer((request, response) => {
+  const url = new URL(request.url, `http://${request.headers.host}`)
+
+  if (request.method === 'POST' && url.pathname === '/api/enquiry') {
+    ;(async () => {
+      if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        sendJson(response, 500, { ok: false, message: 'Email service is not configured.' })
+        return
+      }
+
+      const enquiry = await readJsonBody(request)
+      const name = String(enquiry.name || '').trim()
+      const email = String(enquiry.email || '').trim()
+      const phone = String(enquiry.phone || '').trim()
+      const purpose = String(enquiry.purpose || '').trim()
+      const message = String(enquiry.message || '').trim()
+
+      if (!name || !email) {
+        sendJson(response, 400, { ok: false, message: 'Name and email are required.' })
+        return
+      }
+
+      const text = [
+        'New enquiry from the Monisha Security Agency website:',
+        '',
+        `Name: ${name}`,
+        `Email: ${email}`,
+        `Phone: ${phone || 'Not provided'}`,
+        `Service: ${purpose || 'Not provided'}`,
+        `Message: ${message || 'Not provided'}`,
+      ].join('\n')
+
+      await createTransporter().sendMail({
+        from: `"Monisha Security Website" <${process.env.SMTP_USER}>`,
+        to: enquiryTo,
+        replyTo: email,
+        subject: `Website Enquiry - ${purpose || 'Monisha Security Agency'}`,
+        text,
+      })
+
+      sendJson(response, 200, { ok: true })
+    })().catch((error) => {
+      console.error('Failed to send enquiry email:', error)
+      sendJson(response, 500, { ok: false, message: 'Email could not be sent.' })
+    })
+
+    return
+  }
+
+  const requestedPath = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)
+  const filePath = path.normalize(path.join(root, requestedPath))
+
+  if (!filePath.startsWith(root)) {
+    response.writeHead(403)
+    response.end('Forbidden')
+    return
+  }
+
+  fs.readFile(filePath, (error, content) => {
+    if (error) {
+      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+      response.end('Not found')
+      return
+    }
+
+    response.writeHead(200, { 'Content-Type': types[path.extname(filePath)] || 'application/octet-stream' })
+    response.end(content)
+  })
+})
+
+server.listen(port, host, () => {
+  const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host
+  console.log(`Monisha Security Agency site running at http://${displayHost}:${port}`)
+})

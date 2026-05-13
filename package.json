@@ -1,0 +1,14 @@
+{
+  "name": "msa-website",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static HTML, CSS, and JavaScript website for Monisha Security Agency.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "nodemailer": "^8.0.7"
+  }
+}

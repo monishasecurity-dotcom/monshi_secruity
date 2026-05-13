@@ -1,0 +1,165 @@
+const whatsappNumber = '919381029301'
+
+const directMessage = [
+  'Hello Monisha Security Agency,',
+  '',
+  'I would like to enquire about your Security / Manpower / Housekeeping services.',
+  'Please share more details regarding your services and availability.',
+  '',
+  'Thank you.',
+].join('\n')
+
+const openWhatsapp = (message) => {
+  window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`, '_blank')
+}
+
+const getEnquiryData = () => {
+  const data = new FormData(form)
+
+  return {
+    name: data.get('name')?.toString().trim() || '',
+    email: data.get('email')?.toString().trim() || '',
+    phone: data.get('phone')?.toString().trim() || '',
+    purpose: data.get('purpose')?.toString().trim() || '',
+    message: data.get('message')?.toString().trim() || '',
+  }
+}
+
+const buildEnquiryMessage = (data) =>
+  [
+    'Hello Monisha Security Agency,',
+    '',
+    'I would like to submit an enquiry with the following details:',
+    `Name: ${data.name}`,
+    `Email: ${data.email}`,
+    `Phone: ${data.phone || 'Not provided'}`,
+    `Service: ${data.purpose}`,
+    `Message: ${data.message || 'Not provided'}`,
+    '',
+    'Thank you.',
+  ].join('\n')
+
+const menuToggle = document.querySelector('.menu-toggle')
+const navLinks = document.querySelector('.nav-links')
+
+menuToggle?.addEventListener('click', () => {
+  const isOpen = navLinks.classList.toggle('nav-links--open')
+  menuToggle.classList.toggle('menu-toggle--open', isOpen)
+  menuToggle.setAttribute('aria-expanded', String(isOpen))
+})
+
+document.querySelectorAll('.nav-links a, .brand').forEach((link) => {
+  link.addEventListener('click', () => {
+    navLinks.classList.remove('nav-links--open')
+    menuToggle?.classList.remove('menu-toggle--open')
+    menuToggle?.setAttribute('aria-expanded', 'false')
+  })
+})
+
+const revealObserver = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-visible')
+      }
+    })
+  },
+  { threshold: 0.16 },
+)
+
+document.querySelectorAll('.reveal').forEach((node) => revealObserver.observe(node))
+
+const form = document.querySelector('#enquiry-form')
+const emailButton = document.querySelector('#send-email')
+const formStatus = document.querySelector('#form-status')
+
+const setFormStatus = (message, type = '') => {
+  if (!formStatus) return
+
+  formStatus.textContent = message
+  formStatus.className = `form-status${type ? ` form-status--${type}` : ''}`
+}
+
+form?.addEventListener('submit', (event) => {
+  event.preventDefault()
+  if (!form.reportValidity()) return
+
+  setFormStatus('')
+  openWhatsapp(buildEnquiryMessage(getEnquiryData()))
+})
+
+emailButton?.addEventListener('click', async () => {
+  if (!form?.reportValidity()) return
+
+  const originalText = emailButton.textContent
+  emailButton.disabled = true
+  emailButton.textContent = 'Sending...'
+  setFormStatus('Sending email...')
+
+  try {
+    const response = await fetch('/api/enquiry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(getEnquiryData()),
+    })
+
+    if (!response.ok) {
+      throw new Error('Email request failed')
+    }
+
+    setFormStatus('Mail sent successfully.', 'success')
+    form.reset()
+  } catch (error) {
+    setFormStatus('Email could not be sent. Please try again or use WhatsApp.', 'error')
+  } finally {
+    emailButton.disabled = false
+    emailButton.textContent = originalText
+  }
+})
+
+document.querySelector('#direct-whatsapp')?.addEventListener('click', () => {
+  openWhatsapp(directMessage)
+})
+
+const lightbox = document.querySelector('#media-lightbox')
+const lightboxContent = lightbox?.querySelector('.media-lightbox__content')
+const lightboxTitle = lightbox?.querySelector('.media-lightbox__title')
+
+const closeLightbox = () => {
+  lightbox?.setAttribute('aria-hidden', 'true')
+  lightboxContent.replaceChildren()
+  lightboxTitle.textContent = ''
+}
+
+document.querySelectorAll('[data-media-type]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const type = button.dataset.mediaType
+    const title = button.dataset.title || ''
+    const media =
+      type === 'video'
+        ? Object.assign(document.createElement('video'), {
+            src: button.dataset.src,
+            poster: button.dataset.poster,
+            controls: true,
+            autoplay: true,
+          })
+        : Object.assign(document.createElement('img'), {
+            src: button.dataset.src,
+            alt: title,
+          })
+
+    lightboxContent.replaceChildren(media)
+    lightboxTitle.textContent = title
+    lightbox?.setAttribute('aria-hidden', 'false')
+  })
+})
+
+lightbox?.querySelectorAll('.media-lightbox__backdrop, .media-lightbox__close').forEach((button) => {
+  button.addEventListener('click', closeLightbox)
+})
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && lightbox?.getAttribute('aria-hidden') === 'false') {
+    closeLightbox()
+  }
+})
