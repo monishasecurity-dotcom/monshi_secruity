@@ -6,8 +6,19 @@ require('dotenv').config()
 
 const root = __dirname
 const port = Number(process.env.PORT) || 5176
-const host = process.env.HOST || '0.0.0.0'
 const enquiryTo = 'monisha.security@gmail.com'
+const maxBodySize = 100_000
+const enquiryWindowMs = 15 * 60 * 1000
+const maxEnquiriesPerWindow = 5
+const enquiryAttempts = new Map()
+const allowedPurposes = new Set([
+  'Security Service',
+  'Office Housekeeping',
+  'Industrial Cleaning',
+  'Manpower Outsourcing',
+  'Facility Management',
+  'Sanitation Services',
+])
 
 const types = {
   '.css': 'text/css; charset=utf-8',
@@ -32,7 +43,7 @@ const readJsonBody = (request) =>
     request.on('data', (chunk) => {
       body += chunk
 
-      if (body.length > 100_000) {
+      if (body.length > maxBodySize) {
         request.destroy()
         reject(new Error('Request body too large'))
       }
@@ -60,25 +71,89 @@ const createTransporter = () =>
     },
   })
 
+const getClientIp = (request) => request.socket.remoteAddress || 'unknown'
+
+const isRateLimited = (request) => {
+  const now = Date.now()
+  const ip = getClientIp(request)
+  const attempts = enquiryAttempts.get(ip) || []
+  const recentAttempts = attempts.filter((timestamp) => now - timestamp < enquiryWindowMs)
+
+  if (recentAttempts.length >= maxEnquiriesPerWindow) {
+    enquiryAttempts.set(ip, recentAttempts)
+    return true
+  }
+
+  recentAttempts.push(now)
+  enquiryAttempts.set(ip, recentAttempts)
+  return false
+}
+
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+
+const cleanText = (value, maxLength) => String(value || '').trim().slice(0, maxLength)
+
+const sendStaticFile = (url, response) => {
+  let requestedPath
+
+  try {
+    requestedPath = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)
+  } catch (error) {
+    response.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+    response.end('Bad request')
+    return
+  }
+
+  const filePath = path.resolve(root, `.${requestedPath}`)
+  const relativePath = path.relative(root, filePath)
+
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    response.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+    response.end('Forbidden')
+    return
+  }
+
+  fs.readFile(filePath, (error, content) => {
+    if (error) {
+      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+      response.end('Not found')
+      return
+    }
+
+    response.writeHead(200, { 'Content-Type': types[path.extname(filePath)] || 'application/octet-stream' })
+    response.end(content)
+  })
+}
+
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`)
 
   if (request.method === 'POST' && url.pathname === '/api/enquiry') {
     ;(async () => {
+      if (isRateLimited(request)) {
+        sendJson(response, 429, { ok: false, message: 'Too many enquiries. Please try again later.' })
+        return
+      }
+
       if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
         sendJson(response, 500, { ok: false, message: 'Email service is not configured.' })
         return
       }
 
       const enquiry = await readJsonBody(request)
-      const name = String(enquiry.name || '').trim()
-      const email = String(enquiry.email || '').trim()
-      const phone = String(enquiry.phone || '').trim()
-      const purpose = String(enquiry.purpose || '').trim()
-      const message = String(enquiry.message || '').trim()
+      const name = cleanText(enquiry.name, 80)
+      const email = cleanText(enquiry.email, 120)
+      const phone = cleanText(enquiry.phone, 30)
+      const purpose = cleanText(enquiry.purpose, 60)
+      const message = cleanText(enquiry.message, 1500)
 
-      if (!name || !email) {
-        sendJson(response, 400, { ok: false, message: 'Name and email are required.' })
+      if (!name || !isValidEmail(email)) {
+        sendJson(response, 400, { ok: false, message: 'A valid name and email are required.' })
+        return
+      }
+
+      if (purpose && !allowedPurposes.has(purpose)) {
+        sendJson(response, 400, { ok: false, message: 'Please choose a valid service.' })
         return
       }
 
@@ -109,28 +184,9 @@ const server = http.createServer((request, response) => {
     return
   }
 
-  const requestedPath = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)
-  const filePath = path.normalize(path.join(root, requestedPath))
-
-  if (!filePath.startsWith(root)) {
-    response.writeHead(403)
-    response.end('Forbidden')
-    return
-  }
-
-  fs.readFile(filePath, (error, content) => {
-    if (error) {
-      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
-      response.end('Not found')
-      return
-    }
-
-    response.writeHead(200, { 'Content-Type': types[path.extname(filePath)] || 'application/octet-stream' })
-    response.end(content)
-  })
+  sendStaticFile(url, response)
 })
 
-server.listen(port, host, () => {
-  const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host
-  console.log(`Monisha Security Agency site running at http://${displayHost}:${port}`)
+server.listen(port, '127.0.0.1', () => {
+  console.log(`Monisha Security Agency site running at http://127.0.0.1:${port}`)
 })

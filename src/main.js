@@ -48,6 +48,15 @@ menuToggle?.addEventListener('click', () => {
   menuToggle.setAttribute('aria-expanded', String(isOpen))
 })
 
+document.addEventListener('click', (event) => {
+  if (!navLinks?.classList.contains('nav-links--open')) return
+  if (event.target.closest('.navbar')) return
+
+  navLinks.classList.remove('nav-links--open')
+  menuToggle?.classList.remove('menu-toggle--open')
+  menuToggle?.setAttribute('aria-expanded', 'false')
+})
+
 document.querySelectorAll('.nav-links a, .brand').forEach((link) => {
   link.addEventListener('click', () => {
     navLinks.classList.remove('nav-links--open')
@@ -56,18 +65,24 @@ document.querySelectorAll('.nav-links a, .brand').forEach((link) => {
   })
 })
 
-const revealObserver = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible')
-      }
-    })
-  },
-  { threshold: 0.16 },
-)
+const revealNodes = document.querySelectorAll('.reveal')
 
-document.querySelectorAll('.reveal').forEach((node) => revealObserver.observe(node))
+if ('IntersectionObserver' in window) {
+  const revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible')
+        }
+      })
+    },
+    { threshold: 0.16 },
+  )
+
+  revealNodes.forEach((node) => revealObserver.observe(node))
+} else {
+  revealNodes.forEach((node) => node.classList.add('is-visible'))
+}
 
 const form = document.querySelector('#enquiry-form')
 const emailButton = document.querySelector('#send-email')
@@ -127,8 +142,8 @@ const lightboxTitle = lightbox?.querySelector('.media-lightbox__title')
 
 const closeLightbox = () => {
   lightbox?.setAttribute('aria-hidden', 'true')
-  lightboxContent.replaceChildren()
-  lightboxTitle.textContent = ''
+  lightboxContent?.replaceChildren()
+  if (lightboxTitle) lightboxTitle.textContent = ''
 }
 
 document.querySelectorAll('[data-media-type]').forEach((button) => {
@@ -148,8 +163,8 @@ document.querySelectorAll('[data-media-type]').forEach((button) => {
             alt: title,
           })
 
-    lightboxContent.replaceChildren(media)
-    lightboxTitle.textContent = title
+    lightboxContent?.replaceChildren(media)
+    if (lightboxTitle) lightboxTitle.textContent = title
     lightbox?.setAttribute('aria-hidden', 'false')
   })
 })
