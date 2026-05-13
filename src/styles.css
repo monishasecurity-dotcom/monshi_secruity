@@ -615,6 +615,14 @@ textarea:focus-visible {
   grid-row: span 3;
 }
 
+.gallery-item--portrait-left img {
+  object-position: 40% center;
+}
+
+.gallery-item--portrait-center img {
+  object-position: 50% 22%;
+}
+
 .video-card img {
   height: 100%;
   object-fit: cover;
